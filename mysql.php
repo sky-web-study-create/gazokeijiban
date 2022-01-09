@@ -1,7 +1,7 @@
 <?php
 
   //SQLからデータ取得して表示させる
-  function sqlDataRead($pdo){
+  function readFromSqlRecord($pdo){
     // SQL作成
     $stmt = $pdo->prepare("SELECT * FROM gazokeijiban ORDER BY savedate DESC;");
 
@@ -20,14 +20,14 @@
   }
 
   //SQLにデータを登録する
-  function sqlDataSet($pdo, $title, $author, $comment, $image_url, $savedate){
+  function setPostDataToSql($pdo,$login_info_user, $title, $comment, $image_url, $savedate){
     // SQL作成
-    $stmt = $pdo->prepare("INSERT INTO gazokeijiban (title, author, comment, image_url, savedate
-    ) VALUES (:title, :author, :comment, :image_url, :savedate )");
+    $stmt = $pdo->prepare("INSERT INTO gazokeijiban (login_info_user, title, comment, image_url, savedate
+    ) VALUES (:login_info_user, :title, :comment, :image_url, :savedate )");
 
     // 登録するデータをセット
+    $stmt->bindParam( ':login_info_user', $login_info_user, PDO::PARAM_STR);
     $stmt->bindParam( ':title', $title, PDO::PARAM_STR);
-    $stmt->bindParam( ':author', $author, PDO::PARAM_STR);
     $stmt->bindParam( ':comment', $comment, PDO::PARAM_STR);
     $stmt->bindParam( ':image_url', $image_url, PDO::PARAM_STR);
     $stmt->bindParam( ':savedate', $savedate, PDO::PARAM_STR);
@@ -39,20 +39,41 @@
         echo "SQL失敗:";
         print_r($stmt -> errorInfo());
     }
-
   }
 
-  // データベースに接続
-  try{
-      $pdo = new PDO('mysql:charset=UTF8;dbname=skyweblife', "skyweblife", "skywebpass");
-  }catch(PDOException $e){
-      echo "データ接続に失敗しました" .$e->getMessage();
+  //user_infoの情報を参照
+  function referUserInfo($pdo){
+    // SQL作成
+    $placeholder = $_SESSION["userName"];
+    $stmt = $pdo->prepare("SELECT * FROM login_info WHERE user IN (:placeholder);");
+
+    $stmt->bindValue(':placeholder', $placeholder, PDO::PARAM_STR);
+
+    // SQL実行
+    $res = $stmt->execute();
+
+    if(!$res){
+      echo "データ取得失敗:";
+      print_r($stmt -> errorInfo());
+    }
+
+    //取得したデータを表示
+    $recordArray = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    return $recordArray;
   }
 
-  if($_POST['update']){
+  //SQLに投稿データを登録する
+  function registerPostData(){
 
+    global $pdo;
+
+    $author = $_SESSION["userName"];
+
+    if(empty($_POST['update'])) return;
+
+    //投稿するボタンが押されたときの処理
     $title = $_POST['post_title'];
-    $author = $_POST['author_name'];
     $contents = $_POST['contents'];
 
     //補足：サーバサイドで登録情報の文字数制限を加えるなら、登録されなかったことを知らせるためのエラーページを作り、リダイレクトしてユーザーに知らせるのがよい（今回は未対応）
@@ -69,13 +90,33 @@
     $savedate = date('Y-m-d H:i:s');
 
     // SQLに登録
-    sqlDataSet($pdo, $title, $author, $comment, $image_url, $savedate);
+    setPostDataToSql($pdo, $author, $title, $comment, $image_url, $savedate);
 
     // ページの更新
     header("Location: " . $_SERVER['PHP_SELF']);
   }
 
-  //データベースから情報を取得
-  $dispArray = sqlDataRead($pdo);
+  function getPostDataFromSql(){
+
+    global $pdo;
+
+    //データベースから情報を取得
+    return readFromSqlRecord($pdo);
+  }
+
+  function getLoginDataFromSql(){
+
+    global $pdo;
+
+    //ログイン情報を参照
+    return referUserInfo($pdo);
+  }
+
+  // データベースに接続
+  try{
+      $pdo = new PDO('mysql:charset=UTF8;dbname=skyweblife', "skyweblife", "skywebpass");
+  }catch(PDOException $e){
+      echo "データ接続に失敗しました" .$e->getMessage();
+  }
 
 ?>
